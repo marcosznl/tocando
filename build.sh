@@ -66,6 +66,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 	<key>LSMinimumSystemVersion</key><string>14.0</string>
 	<key>LSApplicationCategoryType</key><string>public.app-category.music</string>
 	<key>NSHighResolutionCapable</key><true/>
+	<key>LSUIElement</key><true/>
+	<key>NSAppleEventsUsageDescription</key><string>Quando um vídeo toma o lugar da música no macOS, o Tocando pergunta ao Música e ao Spotify o que eles estão tocando, para a música continuar no seu status do Discord.</string>
 </dict>
 </plist>
 PLIST

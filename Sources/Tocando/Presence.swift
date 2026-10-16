@@ -1,5 +1,5 @@
 import Combine
-import Foundation
+import AppKit
 
 /// O que aparece no status do Discord (também desenhado na tela, como prévia).
 struct ActivityPreview: Equatable {
@@ -50,7 +50,7 @@ final class Presence: ObservableObject {
         }
         discord.onError = { [weak self] msg in self?.lastError = msg }
         monitor.$track
-            .sink { [weak self] t in self?.trackChanged(t) }
+            .sink { [weak self] t in self?.rawChanged(t) }
             .store(in: &bag)
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: RunLoop.main)
@@ -63,9 +63,113 @@ final class Presence: ObservableObject {
             .store(in: &bag)
     }
 
+    /// Dormindo (modo "junto com o Discord", com o Discord fechado): não lê a
+    /// música nem tenta conectar.
+    @Published private(set) var asleep = false
+
     func start() {
+        asleep = false
         monitor.start()
         refresh()
+    }
+
+    func sleep() {
+        asleep = true
+        lastMusic = nil
+        stopFallback()
+        monitor.stop()
+        refresh()
+    }
+
+    // MARK: - Prioridade da música
+
+    /// O que o macOS diz que está tocando (pode ser um vídeo no navegador).
+    private var rawTrack: Track?
+    /// A última música de um player de música (não vídeo) ligado.
+    private var lastMusic: Track?
+    private var fallbackTimer: Timer?
+
+    /// O macOS só informa quem começou a tocar por último: um vídeo no Safari
+    /// toma o lugar da música, mesmo com ela tocando. A música tem prioridade:
+    /// enquanto ela tocar, continua no status (perguntando ao player dela).
+    private func rawChanged(_ t: Track?) {
+        rawTrack = t
+        if let t, Players.isEnabled(t.playerId), !Players.isVideo(t.playerId) {
+            lastMusic = t
+            stopFallback()
+            trackChanged(t)
+        } else if lastMusic != nil {
+            startFallback()
+        } else {
+            trackChanged(t)
+        }
+    }
+
+    private func startFallback() {
+        if fallbackTimer == nil {
+            fallbackTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.pollMusic() }
+            }
+        }
+        pollMusic()
+    }
+
+    private func stopFallback() {
+        fallbackTimer?.invalidate()
+        fallbackTimer = nil
+    }
+
+    /// A música de antes ainda toca? Música/Spotify respondem por AppleScript;
+    /// os outros ficam até a música acabar, pelo tempo dela.
+    private func pollMusic() {
+        guard let m = lastMusic else { return endFallback() }
+        guard !NSRunningApplication.runningApplications(withBundleIdentifier: m.playerId).isEmpty else {
+            return endFallback()
+        }
+        if ScriptedPlayers.supports(m.playerId) {
+            Task { [weak self] in
+                let answer = await ScriptedPlayers.query(m.playerId)
+                self?.applyMusic(answer, from: m)
+            }
+        } else {
+            applyMusic(.unavailable, from: m)
+        }
+    }
+
+    private func applyMusic(_ answer: ScriptedPlayers.Answer, from m: Track) {
+        guard fallbackTimer != nil, lastMusic?.playerId == m.playerId else { return }   // a música voltou sozinha
+        var music: Track?
+        switch answer {
+        case .track(var t):
+            if let last = lastMusic, last.key == t.key {
+                t.artwork = last.artwork
+                // Mesmo ponto (±2 s): mantém o início, senão o status muda a cada pergunta.
+                if t.playing, last.playing, let a = t.startDate, let b = last.startDate, abs(a.timeIntervalSince(b)) < 2 {
+                    t.elapsed = last.elapsed
+                    t.timestamp = last.timestamp
+                }
+            }
+            lastMusic = t
+            music = t
+        case .stopped:
+            return endFallback()
+        case .unavailable:
+            // Sem resposta: segura a música até ela acabar.
+            guard let pos = m.position(), let d = m.duration, m.playing, pos < d - 1 else { return endFallback() }
+            music = m
+        }
+        // Música pausada e um vídeo de player ligado tocando: aí vale o vídeo.
+        if music?.playing != true, let raw = rawTrack, raw.playing, Players.isEnabled(raw.playerId) {
+            trackChanged(raw)
+        } else {
+            trackChanged(music)
+        }
+    }
+
+    private func endFallback() {
+        lastMusic = nil
+        stopFallback()
+        trackChanged(rawTrack)
     }
 
     func stop() {
@@ -97,6 +201,12 @@ final class Presence: ObservableObject {
 
     /// Recalcula o status e manda para o Discord (o cliente só envia se mudou).
     func refresh() {
+        if asleep {
+            discord.setClientId("")
+            if preview != nil { preview = nil }
+            if blocker != "Esperando o Discord abrir" { blocker = "Esperando o Discord abrir" }
+            return
+        }
         let enabled = Prefs.bool(Prefs.enabled, default: true)
         // App do Discord do player que está tocando ("Ouvindo Spotify"), senão
         // o principal. Sem música, fica no último: não reconecta à toa.

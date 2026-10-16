@@ -1,14 +1,19 @@
 import AppKit
+import Combine
 import SwiftUI
 
+/// Roda em segundo plano, só com o ícone na barra de menus (LSUIElement: sem
+/// Dock nem ⌘Tab). A janela abre pelo painel do ícone, quando precisa.
 @main
 struct TocandoApp: App {
-    // Os dados ficam no AppDelegate, que vive o app todo: com as janelas
-    // fechadas (barra de menus), o status no Discord continua.
+    // Os dados ficam no AppDelegate, que vive o app todo.
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @AppStorage(Prefs.menuBar) private var menuBar = true
     private var presence: Presence { appDelegate.presence }
+    /// Escondido enquanto o app dorme (modo "junto com o Discord").
+    @AppStorage(Prefs.iconHidden) private var iconHidden = false
 
+    // A janela vem primeiro: o SwiftUI a cria ao abrir (e o AppDelegate fecha),
+    // e assim o painel consegue reabri-la depois.
     var body: some Scene {
         Window("Tocando", id: "main") {
             MainView()
@@ -33,13 +38,7 @@ struct TocandoApp: App {
             }
         }
 
-        Settings {
-            SettingsView()
-                .environmentObject(presence)
-                .tint(.accent)
-        }
-
-        MenuBarExtra(isInserted: $menuBar) {
+        MenuBarExtra(isInserted: Binding(get: { !iconHidden }, set: { iconHidden = !$0 })) {
             MenuBarPanel()
                 .environmentObject(presence)
                 .environmentObject(presence.monitor)
@@ -49,6 +48,12 @@ struct TocandoApp: App {
             MenuBarLabel(presence: presence)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+                .environmentObject(presence)
+                .tint(.accent)
+        }
     }
 }
 
@@ -66,67 +71,97 @@ struct SharingCommand: View {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let presence = Presence()
     let nav = Navigator()
+    let discordApp = DiscordWatcher()
+    /// Aberto pelo macOS ao entrar (Itens de Início), e não por você.
     private var launchedAtLogin = false
+    private var bag: Set<AnyCancellable> = []
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // `Tocando --launch-mode manual|login|discord`: muda o modo (como no
+        // painel) e sai, sem abrir nada.
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--launch-mode") {
+            guard i + 1 < args.count, let mode = LaunchMode(rawValue: args[i + 1]) else {
+                print("uso: Tocando --launch-mode manual|login|discord")
+                exit(2)
+            }
+            let error = LaunchMode.set(mode)
+            print(error ?? "Abrir sozinho: \(mode.rawValue)")
+            exit(error == nil ? 0 : 1)
+        }
         let event = NSAppleEventManager.shared().currentAppleEvent
         launchedAtLogin = event?.eventID == kAEOpenApplication
             && event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+        // Guarda o modo uma vez (antes vinha só do item de início).
+        if UserDefaults.standard.string(forKey: Prefs.launchMode) == nil {
+            UserDefaults.standard.set(LaunchMode.current.rawValue, forKey: Prefs.launchMode)
+        }
+        // Antes do ícone aparecer: dormindo, ele nem chega a piscar.
+        UserDefaults.standard.set(!shouldBeAwake, forKey: Prefs.iconHidden)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Prefs.applyAppearance()
-        presence.start()
-        watchWindows()
         if let folder = Snapshot.folder {
+            presence.start()
             Task { await Snapshot.run(self, into: folder) }
             return
         }
-        // Aberto ao entrar no Mac, com a barra de menus: fica só lá em cima.
-        if launchedAtLogin, Prefs.bool(Prefs.menuBar, default: true) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                NSApp.windows.filter(\.isTitledWindow).forEach { $0.close() }
-                NSApp.setActivationPolicy(.accessory)
+        applyLaunchMode()
+        // O Discord abriu ou fechou, ou o modo mudou: acorda ou dorme.
+        discordApp.$isRunning.dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.applyLaunchMode() }
+            .store(in: &bag)
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.applyLaunchMode() }
+            .store(in: &bag)
+
+        // Começa escondido, só no ícone lá em cima (a MainView fecha a janela
+        // ao aparecer). A janela fica aberta na primeira vez (sem o
+        // Application ID) e quando você abre o app com ele dormindo (sem ícone,
+        // senão pareceria que não abriu).
+        if Prefs.clientIdValue.isEmpty {
+            nav.selection = .discord
+            NSApp.activate()
+        } else if !shouldBeAwake && !launchedAtLogin {
+            NSApp.activate()
+        } else {
+            nav.hideOnLaunch = true
+            // Garantia, se a janela aparecer antes da MainView fechar.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                NSApp.windows.filter { $0.isTitledWindow && $0.isVisible }.forEach { $0.close() }
             }
         }
     }
+
+    /// No modo "junto com o Discord", só fica acordado com o Discord aberto.
+    private var shouldBeAwake: Bool { LaunchMode.current != .discord || discordApp.isRunning }
+
+    private func applyLaunchMode() {
+        let awake = shouldBeAwake
+        if awake == presence.asleep || !started {
+            started = true
+            if awake { presence.start() } else { presence.sleep() }
+        }
+        if Prefs.bool(Prefs.iconHidden, default: false) == awake {
+            UserDefaults.standard.set(!awake, forKey: Prefs.iconHidden)
+        }
+    }
+    private var started = false
 
     func applicationWillTerminate(_ notification: Notification) {
         presence.stop()   // fecha o socket: o Discord tira a música do status
     }
 
-    // Fechar a janela não fecha o app quando ele está na barra de menus.
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        !Prefs.bool(Prefs.menuBar, default: true)
-    }
+    // Fechar a janela não fecha o app: ele continua no ícone da barra de menus.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    // Clique no ícone do Dock sem janela aberta: abre a principal.
+    // Abrir o app de novo (Finder, Spotlight) com ele já rodando: mostra a janela.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { nav.openMain?() }
+        if !flag { nav.show(nav.selection ?? .nowPlaying) }
         return true
-    }
-
-    /// Sem janelas, o app sai do Dock e fica só na barra de menus; com uma
-    /// janela aberta, volta para o Dock (e para o ⌘Tab).
-    private func watchWindows() {
-        let center = NotificationCenter.default
-        center.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { note in
-            MainActor.assumeIsolated {
-                guard (note.object as? NSWindow)?.isTitledWindow == true,
-                      NSApp.activationPolicy() != .regular else { return }
-                NSApp.setActivationPolicy(.regular)
-            }
-        }
-        center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
-            let closing = note.object as? NSWindow
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                MainActor.assumeIsolated {
-                    guard Prefs.bool(Prefs.menuBar, default: true) else { return }
-                    let open = NSApp.windows.filter { $0 !== closing && $0.isTitledWindow && $0.isVisible }
-                    if open.isEmpty { NSApp.setActivationPolicy(.accessory) }
-                }
-            }
-        }
     }
 }
 

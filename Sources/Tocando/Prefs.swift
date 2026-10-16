@@ -11,12 +11,15 @@ enum Prefs {
     static let showPaused = "showPaused"
     static let showButtons = "showButtons"
     static let showAlbum = "showAlbum"
-    static let menuBar = "menuBar"
     static let appearance = "appearance"
     static let playerEnabled = "playerEnabled"
     static let seenPlayers = "seenPlayers"
     /// Application ID de um app do Discord com o nome de cada player.
     static let playerClientIds = "playerClientIds"
+    /// Quando o app abre sozinho (LaunchMode).
+    static let launchMode = "launchMode"
+    /// O ícone some enquanto o app dorme (lido pelo MenuBarExtra).
+    static let iconHidden = "iconHidden"
 
     static func bool(_ key: String, default value: Bool) -> Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? value
@@ -43,6 +46,34 @@ extension Color {
     /// Fundo do cartão de atividade, como no perfil do Discord.
     static let discordCard = Color(red: 0.12, green: 0.12, blue: 0.14)
     static let discordGreen = Color(red: 0.14, green: 0.65, blue: 0.35)
+}
+
+/// Quando o Tocando abre sozinho.
+enum LaunchMode: String {
+    /// Só quando você abre.
+    case manual
+    /// Ao entrar no Mac (Itens de Início).
+    case login
+    /// Junto com o Discord: abre ao entrar no Mac, mas dorme (sem ícone, sem
+    /// ler a música) enquanto o Discord estiver fechado. O macOS não abre um
+    /// app quando outro abre, então é assim que dá.
+    case discord
+
+    @MainActor
+    static var current: LaunchMode {
+        if let raw = UserDefaults.standard.string(forKey: Prefs.launchMode), let m = LaunchMode(rawValue: raw) {
+            return m
+        }
+        return LoginItem.isOn ? .login : .manual
+    }
+
+    /// Muda o modo e liga/desliga o item de início. Devolve o erro, se houver.
+    @MainActor
+    static func set(_ mode: LaunchMode) -> String? {
+        let error = LoginItem.set(mode != .manual)
+        UserDefaults.standard.set((error == nil ? mode : current).rawValue, forKey: Prefs.launchMode)
+        return error
+    }
 }
 
 /// Abrir ao entrar no Mac (Itens de Início).

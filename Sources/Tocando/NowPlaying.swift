@@ -109,6 +109,9 @@ final class NowPlayingMonitor: ObservableObject {
         stopped = true
         process?.terminate()
         process = nil
+        state = [:]
+        buffer.removeAll()
+        if track != nil { track = nil }
     }
 
     /// Tocar/pausar, próxima e anterior no player que está tocando.

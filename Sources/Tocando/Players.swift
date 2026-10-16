@@ -61,6 +61,15 @@ enum Players {
         return icon
     }
 
+    /// Navegadores e players de vídeo: a música (de outro player) tem
+    /// prioridade sobre eles no status.
+    static func isVideo(_ id: String) -> Bool {
+        offByDefault.contains(id) || id == "com.marcos.tubeplayer" || id == testVideoId
+    }
+
+    /// Testes: um player falso que faz papel de navegador.
+    private static let testVideoId = ProcessInfo.processInfo.environment["TOCANDO_VIDEO_BUNDLE"]
+
     static func isEnabled(_ id: String) -> Bool {
         let map = UserDefaults.standard.dictionary(forKey: Prefs.playerEnabled) as? [String: Bool] ?? [:]
         return map[id] ?? !offByDefault.contains(id)

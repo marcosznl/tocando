@@ -10,11 +10,19 @@ final class Navigator: ObservableObject {
     @Published var selection: SidebarItem? = .nowPlaying
     /// Abre (ou traz para a frente) a janela principal; vem do SwiftUI.
     var openMain: (() -> Void)?
+    /// O SwiftUI abre a janela ao iniciar; o app começa só na barra de menus.
+    var hideOnLaunch = false
 
+    /// Mostra a janela principal nesta tela, na frente dos outros apps (sem
+    /// Dock, senão ela pode abrir escondida atrás deles).
     func show(_ item: SidebarItem) {
         selection = item
-        NSApp.activate()
         openMain?()
+        NSApp.activate()
+        DispatchQueue.main.async {
+            NSApp.windows.first { $0.isTitledWindow && $0.identifier?.rawValue.hasPrefix("main") == true }?
+                .makeKeyAndOrderFront(nil)
+        }
     }
 }
 
@@ -22,6 +30,7 @@ struct MainView: View {
     @EnvironmentObject private var nav: Navigator
     @EnvironmentObject private var presence: Presence
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         NavigationSplitView {
@@ -31,7 +40,13 @@ struct MainView: View {
             detail
                 .frame(minWidth: 520, minHeight: 420)
         }
-        .onAppear { nav.openMain = { [openWindow] in openWindow(id: "main") } }
+        .onAppear {
+            nav.openMain = { [openWindow] in openWindow(id: "main") }
+            if nav.hideOnLaunch {
+                nav.hideOnLaunch = false
+                DispatchQueue.main.async { dismissWindow(id: "main") }   // ainda não existe no onAppear
+            }
+        }
     }
 
     @ViewBuilder

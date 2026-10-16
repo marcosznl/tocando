@@ -19,11 +19,21 @@ o código-fonte do app, mas não copia nada do Music Presence (código, nome ou 
   pública) e usa a capa e o link de lá. Música que não está no catálogo fica com o ícone do app.
 - **Players**: liga e desliga o compartilhamento de cada player. Navegadores e players de vídeo
   começam desligados.
+- **A música tem prioridade**: o macOS só informa quem começou a tocar por último, então um vídeo
+  no navegador "rouba" o Tocando agora, mesmo com a música tocando. O Tocando segura a música:
+  pergunta ao Música e ao Spotify (AppleScript; o macOS pede permissão na primeira vez) se ela
+  ainda toca, e nos outros players a mantém até acabar, pelo tempo dela. O vídeo só aparece
+  quando não há música tocando (e se o player dele estiver ligado).
 - **Histórico**: grade com as músicas que tocaram, por dia, com capa e player. Clique duplo abre
   no Apple Music.
-- **Barra de menus**: fechando a janela, o Tocando continua lá em cima, com a música, os
-  controles e um botão para ligar/desligar o compartilhamento (⌘D). Opcional: abrir ao entrar
-  no Mac.
+- **Segundo plano**: o Tocando não aparece no Dock nem no ⌘Tab, só como um ícone na barra de
+  menus (nota = no status, pausa = fora do status, riscado = desligado). Clicando no ícone: a
+  música com os controles, o botão de compartilhar (⌘D), as telas (Tocando agora, Histórico,
+  Players, Discord), as opções de abrir sozinho, Ajustes e Sair. A janela só abre quando você
+  pede (ou na primeira vez, para configurar o Discord).
+- **Abrir sozinho**: não, ao entrar no Mac, ou **junto com o Discord**. O macOS não abre um app
+  quando outro abre; então, nesse modo, o Tocando abre ao entrar no Mac mas fica dormindo (sem
+  ícone, sem ler a música, ~35 MB) enquanto o Discord estiver fechado, e acorda quando ele abre.
 
 ## Primeira vez: o app no Discord
 

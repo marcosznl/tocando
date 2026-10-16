@@ -12,8 +12,7 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @AppStorage(Prefs.appearance) private var appearance = ""
-    @AppStorage(Prefs.menuBar) private var menuBar = true
-    @State private var loginItem = LoginItem.isOn
+    @AppStorage(Prefs.launchMode) private var launchMode = LaunchMode.manual.rawValue
     @State private var loginError: String?
 
     var body: some View {
@@ -28,15 +27,19 @@ private struct GeneralSettings: View {
                 .onChange(of: appearance) { Prefs.applyAppearance() }
             }
             Section("Segundo plano") {
-                Toggle("Ficar na barra de menus", isOn: $menuBar)
-                Text("Fechando a janela, o Tocando continua lá em cima e o status no Discord segue atualizando. Para sair de vez, use Sair no menu.")
+                Text("O Tocando roda em segundo plano, só com o ícone na barra de menus (sem Dock). Clique no ícone para ver a música, abrir as telas ou sair.")
                     .font(.caption).foregroundStyle(.secondary)
-                Toggle("Abrir ao entrar no Mac", isOn: Binding(
-                    get: { loginItem },
-                    set: { on in
-                        loginError = LoginItem.set(on)
-                        loginItem = LoginItem.isOn
-                    }))
+                Picker("Abrir sozinho", selection: Binding(
+                    get: { launchMode },
+                    set: { raw in loginError = LaunchMode.set(LaunchMode(rawValue: raw) ?? .manual) })) {
+                    Text("Não").tag(LaunchMode.manual.rawValue)
+                    Text("Ao entrar no Mac").tag(LaunchMode.login.rawValue)
+                    Text("Junto com o Discord").tag(LaunchMode.discord.rawValue)
+                }
+                if launchMode == LaunchMode.discord.rawValue {
+                    Text("O Tocando abre ao entrar no Mac, mas fica dormindo, sem ícone e sem ler a música, enquanto o Discord estiver fechado. Para abrir a janela nesse meio-tempo, abra o Tocando pelo Finder ou pelo Spotlight.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if let loginError { Text(loginError).font(.caption).foregroundStyle(.orange) }
             }
         }

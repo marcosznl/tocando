@@ -12,13 +12,15 @@ struct MenuBarLabel: View {
     }
 }
 
-/// Painel da barra de menus: a música, os controles, o status no Discord e atalhos.
+/// Painel do ícone: a música e os controles, o status no Discord e as telas
+/// do app, como um menu.
 struct MenuBarPanel: View {
     @EnvironmentObject private var presence: Presence
     @EnvironmentObject private var nav: Navigator
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @AppStorage(Prefs.enabled) private var enabled = true
+    @AppStorage(Prefs.launchMode) private var launchMode = LaunchMode.manual.rawValue
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,39 +66,92 @@ struct MenuBarPanel: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 22)
             }
-            Divider()
-            HStack(spacing: 8) {
-                StatusDot(sharing: presence.isSharing, enabled: enabled)
-                Text(presence.isSharing ? "No seu status do Discord" : (presence.blocker ?? ""))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer()
+            if presence.track != nil || !enabled {   // sem música, o "Nada tocando" acima já diz
+                HStack(spacing: 8) {
+                    StatusDot(sharing: presence.isSharing, enabled: enabled)
+                    Text(presence.isSharing ? "No seu status do Discord" : (presence.blocker ?? ""))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
             Divider()
-            HStack {
-                Button("Abrir o Tocando") { showMain() }
-                Spacer()
-                Button {
+            VStack(spacing: 0) {
+                MenuRow("Tocando agora", systemImage: "music.note") { nav.show(.nowPlaying) }
+                MenuRow("Histórico", systemImage: "clock.arrow.circlepath") { nav.show(.history) }
+                MenuRow("Players", systemImage: "hifispeaker.2") { nav.show(.players) }
+                MenuRow("Discord", systemImage: "person.crop.circle.badge.checkmark") { nav.show(.discord) }
+            }
+            .padding(5)
+            Divider()
+            VStack(spacing: 0) {
+                MenuRow("Abrir ao entrar no Mac", systemImage: "power.circle", checked: launchMode == LaunchMode.login.rawValue) {
+                    _ = LaunchMode.set(launchMode == LaunchMode.login.rawValue ? .manual : .login)
+                }
+                MenuRow("Abrir junto com o Discord", systemImage: "bubble.left.and.bubble.right",
+                        checked: launchMode == LaunchMode.discord.rawValue) {
+                    _ = LaunchMode.set(launchMode == LaunchMode.discord.rawValue ? .manual : .discord)
+                }
+                .help("Fica dormindo, sem ícone, enquanto o Discord estiver fechado")
+                MenuRow("Ajustes…", systemImage: "gearshape", shortcut: "⌘,") {
                     NSApp.activate()   // senão os Ajustes abrem atrás dos outros apps
                     openSettings()
-                } label: { Image(systemName: "gearshape") }
-                    .help("Ajustes")
-                Button { NSApp.terminate(nil) } label: { Image(systemName: "power") }
-                    .help("Sair do Tocando")
+                }
+                MenuRow("Sair do Tocando", systemImage: "xmark.circle", shortcut: "⌘Q") { NSApp.terminate(nil) }
+                    .keyboardShortcut("q")
             }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(5)
         }
         .frame(width: 320)
+        .onAppear {
+            if nav.openMain == nil { nav.openMain = { [openWindow] in openWindow(id: "main") } }
+        }
+    }
+}
+
+/// Linha de menu: ícone, texto, marca ou atalho, com destaque ao passar o mouse.
+struct MenuRow: View {
+    let title: String
+    let systemImage: String
+    var checked: Bool?
+    var shortcut: String?
+    let action: () -> Void
+    @State private var hover = false
+
+    init(_ title: String, systemImage: String, checked: Bool? = nil, shortcut: String? = nil,
+         action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.checked = checked
+        self.shortcut = shortcut
+        self.action = action
     }
 
-    private func showMain() {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
-        openWindow(id: "main")
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .frame(width: 18)
+                    .foregroundStyle(hover ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                Text(title)
+                Spacer()
+                if checked == true {
+                    Image(systemName: "checkmark").font(.caption.weight(.semibold))
+                }
+                if let shortcut {
+                    Text(shortcut).foregroundStyle(hover ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.tertiary))
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .foregroundStyle(hover ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .background(hover ? Color.accentColor : .clear, in: RoundedRectangle(cornerRadius: 5))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
     }
 }
