@@ -72,6 +72,24 @@ enum Players {
         UserDefaults.standard.set(map, forKey: Prefs.playerEnabled)
     }
 
+    /// App do Discord só deste player (para aparecer "Ouvindo Spotify"), se houver.
+    static func clientId(for id: String) -> String? {
+        let map = UserDefaults.standard.dictionary(forKey: Prefs.playerClientIds) as? [String: String] ?? [:]
+        guard let v = map[id]?.trimmingCharacters(in: .whitespacesAndNewlines), DiscordApps.looksValid(v) else { return nil }
+        return v
+    }
+
+    static func rawClientId(for id: String) -> String {
+        (UserDefaults.standard.dictionary(forKey: Prefs.playerClientIds) as? [String: String])?[id] ?? ""
+    }
+
+    static func setClientId(_ value: String, for id: String) {
+        var map = UserDefaults.standard.dictionary(forKey: Prefs.playerClientIds) as? [String: String] ?? [:]
+        let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        map[id] = v.isEmpty ? nil : v
+        UserDefaults.standard.set(map, forKey: Prefs.playerClientIds)
+    }
+
     /// Players que já tocaram alguma coisa (para a tela Players).
     static var seen: [String] { UserDefaults.standard.stringArray(forKey: Prefs.seenPlayers) ?? [] }
 

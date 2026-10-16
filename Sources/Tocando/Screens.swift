@@ -111,6 +111,8 @@ struct PlayerChip: View {
 struct DiscordCard: View {
     let preview: ActivityPreview
     let track: Track
+    /// Ícone do app no portal (aparece quando não há capa).
+    var appIcon: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -151,6 +153,8 @@ struct DiscordCard: View {
     private var cover: some View {
         if let url = preview.imageURL {
             CoverView(url: url, size: 80, radius: 8)   // a do catálogo: é a que o Discord mostra
+        } else if let appIcon {
+            CoverView(url: appIcon.absoluteString, size: 80, radius: 8)
         } else {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
@@ -166,6 +170,7 @@ struct NowPlayingScreen: View {
     @EnvironmentObject private var presence: Presence
     @EnvironmentObject private var monitor: NowPlayingMonitor
     @EnvironmentObject private var nav: Navigator
+    @ObservedObject private var apps = DiscordApps.shared
     @AppStorage(Prefs.clientId) private var clientId = ""
 
     var body: some View {
@@ -234,8 +239,11 @@ struct NowPlayingScreen: View {
                     .foregroundStyle(.secondary)
             }
             if let p = presence.preview {
-                DiscordCard(preview: p, track: t)
+                DiscordCard(preview: p, track: t, appIcon: apps.info[presence.activeClientId]?.iconURL)
                     .opacity(presence.isSharing ? 1 : 0.55)
+                Text("Na lista de membros e nas conversas: “\(p.memberLine)”")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             if let e = presence.lastError {
                 Label("O Discord recusou a última atualização: \(e)", systemImage: "exclamationmark.triangle")
@@ -385,35 +393,30 @@ struct PlayersScreen: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(ids, id: \.self) { id in
-                    HStack(spacing: 12) {
-                        PlayerIcon(id: id, size: 32)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(Players.name(id))
-                            Text(id).font(.caption).foregroundStyle(.tertiary)
+                    PlayerRow(id: id, playing: presence.track?.playerId == id, version: $version)
+                        .contextMenu {
+                            Button("Esquecer este player") { Players.forget(id); version += 1 }
                         }
-                        if presence.track?.playerId == id {
-                            Text("Tocando")
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 6).padding(.vertical, 2)
-                                .background(Color.accent.opacity(0.18), in: Capsule())
-                                .foregroundStyle(Color.accent)
-                        }
-                        Spacer()
-                        Toggle("Compartilhar", isOn: Binding(
-                            get: { Players.isEnabled(id) },
-                            set: { Players.setEnabled(id, $0); version += 1 }))
-                            .toggleStyle(.switch)
-                            .labelsHidden()
-                    }
-                    .padding(.vertical, 2)
-                    .contextMenu {
-                        Button("Esquecer este player") { Players.forget(id); version += 1 }
-                    }
                 }
             } footer: {
                 Text("Navegadores e players de vídeo começam desligados, para um vídeo qualquer não ir parar no seu status. Ligue os que quiser.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("No perfil, o Discord mostra “Ouvindo” e o nome do app criado no portal. Para aparecer “Ouvindo Spotify”, “Ouvindo Apple Music” etc.:")
+                    Text("1. No portal do Discord, crie um app com o nome do player (New Application → “Spotify”).")
+                    Text("2. Opcional: em App Icon, envie o ícone do player (aparece quando a música não tem capa).")
+                    Text("3. Copie o Application ID e cole no campo do player acima.")
+                    Text("Players sem app próprio usam o app principal (tela Discord).")
+                        .foregroundStyle(.tertiary)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                Button("Abrir o portal do Discord") { Links.open(Links.developerPortal) }
+            } header: {
+                Text("Nome do player no status")
             }
         }
         .formStyle(.grouped)
@@ -425,6 +428,76 @@ struct PlayersScreen: View {
         var ids = Players.seen
         if let cur = presence.track?.playerId, !ids.contains(cur) { ids.insert(cur, at: 0) }
         return ids
+    }
+}
+
+/// Um player: compartilhar ou não, e o app do Discord com o nome dele.
+private struct PlayerRow: View {
+    let id: String
+    let playing: Bool
+    @Binding var version: Int
+    @ObservedObject private var apps = DiscordApps.shared
+    @State private var clientId = ""
+
+    var body: some View {
+        let _ = version
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                PlayerIcon(id: id, size: 32)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(Players.name(id))
+                    Text(id).font(.caption).foregroundStyle(.tertiary)
+                }
+                if playing {
+                    Text("Tocando")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Color.accent.opacity(0.18), in: Capsule())
+                        .foregroundStyle(Color.accent)
+                }
+                Spacer()
+                Toggle("Compartilhar", isOn: Binding(
+                    get: { Players.isEnabled(id) },
+                    set: { Players.setEnabled(id, $0); version += 1 }))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            }
+            HStack(spacing: 8) {
+                TextField("App do Discord", text: $clientId, prompt: Text("Application ID do app no Discord"))
+                    .labelsHidden()
+                    .multilineTextAlignment(.leading)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 230)
+                    .onChange(of: clientId) { _, v in
+                        Players.setClientId(v, for: id)
+                        apps.load(v.trimmingCharacters(in: .whitespaces))
+                    }
+                appStatus
+                Spacer()
+            }
+            .padding(.leading, 44)
+        }
+        .padding(.vertical, 2)
+        .onAppear { clientId = Players.rawClientId(for: id) }
+    }
+
+    @ViewBuilder
+    private var appStatus: some View {
+        let v = clientId.trimmingCharacters(in: .whitespaces)
+        if v.isEmpty {
+            Text("usa o app principal").font(.caption).foregroundStyle(.tertiary)
+        } else if !DiscordApps.looksValid(v) {
+            Label("só números, 17 a 20 dígitos", systemImage: "exclamationmark.triangle")
+                .font(.caption).foregroundStyle(.orange)
+        } else if apps.invalid.contains(v) {
+            Label("o Discord não achou esse app", systemImage: "xmark.circle")
+                .font(.caption).foregroundStyle(.orange)
+        } else if let info = apps.info[v] {
+            Label("Ouvindo \(info.name)", systemImage: "checkmark.circle.fill")
+                .font(.caption).foregroundStyle(Color.discordGreen)
+        } else {
+            ProgressView().controlSize(.small)
+        }
     }
 }
 
@@ -448,10 +521,10 @@ struct DiscordForm: View {
     @AppStorage(Prefs.showPaused) private var showPaused = false
     @AppStorage(Prefs.enabled) private var enabled = true
 
-    private var idLooksValid: Bool {
-        let id = clientId.trimmingCharacters(in: .whitespaces)
-        return id.count >= 17 && id.count <= 21 && id.allSatisfy(\.isNumber)
-    }
+    @ObservedObject private var apps = DiscordApps.shared
+
+    private var trimmedId: String { clientId.trimmingCharacters(in: .whitespaces) }
+    private var idLooksValid: Bool { DiscordApps.looksValid(trimmedId) }
 
     var body: some View {
         Form {
@@ -466,9 +539,18 @@ struct DiscordForm: View {
             }
             Section {
                 TextField("Application ID", text: $clientId, prompt: Text("ex: 1234567890123456789"))
+                    .task(id: trimmedId) { apps.load(trimmedId) }
                 if !clientId.isEmpty && !idLooksValid {
                     Text("O Application ID tem só números (17 a 20 dígitos).")
                         .font(.caption).foregroundStyle(.orange)
+                } else if let name = apps.info[trimmedId]?.name {
+                    LabeledContent("Nome no perfil") {
+                        Text("Ouvindo \(name)")
+                    }
+                    Text("Para trocar, mude o nome do app no portal. Para mostrar o nome de cada player (Spotify, Apple Music…), veja a tela Players.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if apps.invalid.contains(trimmedId) {
+                    Text("O Discord não achou um app com esse ID.").font(.caption).foregroundStyle(.orange)
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("1. Abra o portal de desenvolvedores do Discord e clique em New Application.")
@@ -489,10 +571,10 @@ struct DiscordForm: View {
                 Text("App no Discord")
             }
             Section("Status") {
-                Picker("Depois de “Ouvindo”", selection: $listeningTo) {
+                Picker("Na lista de membros, depois de “Ouvindo”", selection: $listeningTo) {
                     Text("Artista").tag("artist")
                     Text("Música").tag("title")
-                    Text("Nome do app").tag("app")
+                    Text("Nome do app (player)").tag("app")
                 }
                 Toggle("Mostrar o álbum", isOn: $showAlbum)
                 Toggle("Botão “\(Players.storeButton)”", isOn: $showButtons)

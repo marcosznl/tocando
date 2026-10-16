@@ -15,6 +15,8 @@ enum Prefs {
     static let appearance = "appearance"
     static let playerEnabled = "playerEnabled"
     static let seenPlayers = "seenPlayers"
+    /// Application ID de um app do Discord com o nome de cada player.
+    static let playerClientIds = "playerClientIds"
 
     static func bool(_ key: String, default value: Bool) -> Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? value

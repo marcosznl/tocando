@@ -3,8 +3,10 @@ import Foundation
 
 /// O que aparece no status do Discord (também desenhado na tela, como prévia).
 struct ActivityPreview: Equatable {
-    /// "Ouvindo Billie Eilish".
+    /// "Ouvindo Spotify": no perfil, sempre o nome do app do Discord.
     var header: String
+    /// "Ouvindo Billie Eilish": a linha curta da lista de membros.
+    var memberLine: String
     var details: String
     var state: String?
     var largeText: String?
@@ -33,6 +35,9 @@ final class Presence: ObservableObject {
 
     var isSharing: Bool { blocker == nil }
 
+    /// O app do Discord em uso agora (o do player, ou o principal).
+    @Published private(set) var activeClientId = ""
+
     private var currentKey: String?
     private var lookup: Task<Void, Never>?
     private var bag: Set<AnyCancellable> = []
@@ -48,6 +53,11 @@ final class Presence: ObservableObject {
             .sink { [weak self] t in self?.trackChanged(t) }
             .store(in: &bag)
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refresh() }
+            .store(in: &bag)
+        // O nome do app chega depois: a prévia mostra "Ouvindo <nome>".
+        DiscordApps.shared.$info
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refresh() }
             .store(in: &bag)
@@ -88,7 +98,13 @@ final class Presence: ObservableObject {
     /// Recalcula o status e manda para o Discord (o cliente só envia se mudou).
     func refresh() {
         let enabled = Prefs.bool(Prefs.enabled, default: true)
-        let clientId = Prefs.clientIdValue
+        // App do Discord do player que está tocando ("Ouvindo Spotify"), senão
+        // o principal. Sem música, fica no último: não reconecta à toa.
+        let mainId = Prefs.clientIdValue
+        let playerIds = Set(Players.seen.compactMap { Players.clientId(for: $0) })
+        let clientId = track.flatMap { Players.clientId(for: $0.playerId) }
+            ?? (track == nil && playerIds.contains(activeClientId) ? activeClientId : mainId)
+        if activeClientId != clientId { activeClientId = clientId }
         discord.setClientId(enabled ? clientId : "")
 
         let showPaused = Prefs.bool(Prefs.showPaused, default: false)
@@ -125,18 +141,20 @@ final class Presence: ObservableObject {
 
     private func makePreview(_ t: Track) -> ActivityPreview {
         let mode = UserDefaults.standard.string(forKey: Prefs.listeningTo) ?? "artist"
-        let header: String
+        let appName = DiscordApps.shared.name(activeClientId) ?? "seu app no Discord"
+        let memberLine: String
         switch mode {
-        case "title": header = "Ouvindo \(t.title)"
-        case "app": header = "Ouvindo (nome do app no Discord)"
-        default: header = "Ouvindo \(t.artist ?? t.title)"
+        case "title": memberLine = "Ouvindo \(t.title)"
+        case "app": memberLine = "Ouvindo \(appName)"
+        default: memberLine = "Ouvindo \(t.artist ?? t.title)"
         }
         let start = t.startDate
         var end: Date?
         if let start, let d = t.duration { end = start.addingTimeInterval(d / ((t.playbackRate ?? 1) > 0 ? t.playbackRate! : 1)) }
         let album = Prefs.bool(Prefs.showAlbum, default: true) ? t.album : nil
         return ActivityPreview(
-            header: header,
+            header: "Ouvindo \(appName)",
+            memberLine: memberLine,
             details: t.title,
             state: t.artist,
             largeText: t.playing ? album : (album.map { "Pausado · \($0)" } ?? "Pausado"),

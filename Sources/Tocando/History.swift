@@ -24,7 +24,9 @@ final class History: ObservableObject {
 
     static let folder: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let url = base.appendingPathComponent("Tocando", isDirectory: true)
+        // Cópias de teste (outro bundle id) não mexem no histórico de verdade.
+        let id = Bundle.main.bundleIdentifier ?? "com.marcos.tocando"
+        let url = base.appendingPathComponent(id == "com.marcos.tocando" ? "Tocando" : id, isDirectory: true)
         try? FileManager.default.createDirectory(at: url.appendingPathComponent("Covers"), withIntermediateDirectories: true)
         return url
     }()

@@ -35,6 +35,12 @@ perfil.
 3. Em **General Information**, copie o **Application ID** e cole no Tocando (tela Discord).
 4. Opcional: em **App Icon**, envie o `DiscordIcon.png` (botão "Mostrar o ícone no Finder").
 
+No perfil o Discord sempre mostra "Ouvindo <nome do app>". Para aparecer "Ouvindo Spotify",
+"Ouvindo Apple Music" etc., crie um app para cada player com o nome dele e cole o ID ao lado do
+player na tela **Players**. O Tocando troca de app conforme o player que está tocando, e os
+players sem app próprio usam o principal. O nome de cada app é conferido no endpoint público
+`discord.com/api/v10/applications/<id>/rpc`.
+
 O Discord precisa estar aberto neste Mac (o app de desktop, não o site).
 
 ## Como funciona

@@ -96,10 +96,15 @@ final class DiscordIPC: @unchecked Sendable {
     }
 
     private static func openSocket() -> Int32? {
+        let env = ProcessInfo.processInfo.environment
         var dirs: [String] = []
-        if let t = ProcessInfo.processInfo.environment["TMPDIR"] { dirs.append(t) }
-        dirs.append(NSTemporaryDirectory())
-        dirs.append("/tmp/")
+        if let test = env["TOCANDO_IPC_DIR"] {
+            dirs = [test]   // testes: só esta pasta (um Discord falso), nunca o de verdade
+        } else {
+            if let t = env["TMPDIR"] { dirs.append(t) }
+            dirs.append(NSTemporaryDirectory())
+            dirs.append("/tmp/")
+        }
         var seen = Set<String>()
         for dir in dirs {
             let base = dir.hasSuffix("/") ? dir : dir + "/"
