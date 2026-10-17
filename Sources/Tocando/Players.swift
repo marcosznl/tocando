@@ -113,8 +113,36 @@ enum Players {
         UserDefaults.standard.set(seen.filter { $0 != id }, forKey: Prefs.seenPlayers)
     }
 
-    /// Texto do botão no status (o link é sempre do Apple Music).
-    static let storeButton = "Ouvir no Apple Music"
+    static let spotify = "com.spotify.client"
+    static let deezer = "com.deezer.deezer-desktop"
+
+    /// Botão do status: a música no serviço do player que está tocando. Link
+    /// exato quando dá (Apple Music e Deezer pelo catálogo, Spotify pelo
+    /// próprio app); senão, a busca no serviço.
+    static func button(for t: Track, match: StoreMatch?, spotifyURI: String?) -> (label: String, url: String)? {
+        let query = [t.artist, t.title].compactMap { $0 }.joined(separator: " ")
+        func search(_ base: String, path: Bool = true) -> String? {
+            let allowed: CharacterSet = path ? .urlPathAllowed.subtracting(["/"]) : .urlQueryAllowed.subtracting(["&", "=", "+"])
+            return query.addingPercentEncoding(withAllowedCharacters: allowed).map { base + $0 }
+        }
+        switch t.playerId {
+        case spotify:
+            if let uri = spotifyURI, uri.hasPrefix("spotify:") {
+                let parts = uri.split(separator: ":")   // spotify:track:ID
+                if parts.count == 3 { return ("Ouvir no Spotify", "https://open.spotify.com/\(parts[1])/\(parts[2])") }
+            }
+            return search("https://open.spotify.com/search/").map { ("Ouvir no Spotify", $0) }
+        case deezer:
+            if let url = match?.deezerURL { return ("Ouvir no Deezer", url) }
+            return search("https://www.deezer.com/search/").map { ("Ouvir no Deezer", $0) }
+        case "com.tidal.desktop":
+            return search("https://listen.tidal.com/search?q=", path: false).map { ("Ouvir no TIDAL", $0) }
+        case "com.amazon.music":
+            return search("https://music.amazon.com/search/").map { ("Ouvir no Amazon Music", $0) }
+        default:
+            return match?.trackURL.map { ("Ouvir no Apple Music", $0) }
+        }
+    }
 }
 
 /// Ícone do app do player, do tamanho pedido.

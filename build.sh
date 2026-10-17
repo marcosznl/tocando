@@ -1,8 +1,13 @@
 #!/bin/zsh
 # Compila e monta "Tocando.app" (e o .dmg de instalação).
 # Precisa do SDK 26.5 (o SDK 27 das Command Line Tools não tem o plugin SwiftUIMacros).
+#
+# Uso: ./build.sh            só monta (Tocando.app e Tocando.dmg aqui na pasta)
+#      ./build.sh --install  monta, instala em /Applications e abre
 set -euo pipefail
 cd "$(dirname "$0")"
+INSTALL=false
+[[ "${1:-}" == "--install" ]] && INSTALL=true
 
 APP="Tocando.app"
 VERSION="1.0"
@@ -88,3 +93,20 @@ rm -f "$DMG"
 hdiutil create -quiet -volname "Tocando $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 rm -rf "$STAGE"
 echo "DMG: $(pwd)/$DMG ($(du -h "$DMG" | cut -f1))"
+
+# Instalar: troca o app em /Applications, leva o item de início (abrir
+# sozinho) para lá e abre a versão nova.
+if $INSTALL; then
+    DEST=/Applications/Tocando.app
+    pkill -x Tocando 2>/dev/null && sleep 1 || true
+    rm -rf "$DEST"
+    cp -R "$APP" "$DEST"
+    MODE=$(defaults read com.marcos.tocando launchMode 2>/dev/null || echo manual)
+    if [[ "$MODE" != "manual" ]]; then
+        # Cancela o registro antigo (que pode apontar para esta pasta) e registra o novo.
+        "$DEST/Contents/MacOS/Tocando" --launch-mode manual >/dev/null
+        "$DEST/Contents/MacOS/Tocando" --launch-mode "$MODE"
+    fi
+    open "$DEST"
+    echo "Instalado: $DEST"
+fi

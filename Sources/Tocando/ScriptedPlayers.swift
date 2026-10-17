@@ -52,6 +52,20 @@ enum ScriptedPlayers {
         }
     }
 
+    /// "spotify:track:…" ou "spotify:episode:…" (podcast) da faixa atual do Spotify.
+    static func spotifyURI() async -> String? {
+        let id = "com.spotify.client"
+        guard !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty else { return nil }
+        return await withCheckedContinuation { cont in
+            queue.async {
+                var error: NSDictionary?
+                let r = NSAppleScript(source: "tell application id \"\(id)\" to return spotify url of current track")?
+                    .executeAndReturnError(&error)
+                cont.resume(returning: error == nil ? r?.stringValue : nil)
+            }
+        }
+    }
+
     private static func parse(_ d: NSAppleEventDescriptor?, error: NSDictionary?, bundleId: String) -> Answer {
         guard error == nil, let d else { return .unavailable }
         guard d.numberOfItems >= 6 else { return .stopped }

@@ -133,8 +133,8 @@ struct DiscordCard: View {
                     }
                 }
             }
-            if preview.buttonURL != nil {
-                Text(Players.storeButton)
+            if preview.buttonURL != nil, let label = preview.buttonLabel {
+                Text(label)
                     .font(.system(size: 12, weight: .medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 7)
@@ -438,6 +438,7 @@ private struct PlayerRow: View {
     @Binding var version: Int
     @ObservedObject private var apps = DiscordApps.shared
     @State private var clientId = ""
+    @AppStorage(Prefs.spotifyOfficial) private var spotifyOfficial = false
 
     var body: some View {
         let _ = version
@@ -476,6 +477,14 @@ private struct PlayerRow: View {
                 Spacer()
             }
             .padding(.leading, 44)
+            if id == Players.spotify {
+                VStack(alignment: .leading, spacing: 2) {
+                    Toggle("Deixar as músicas para a integração oficial do Discord", isOn: $spotifyOfficial)
+                    Text("Se a sua conta do Spotify está conectada ao Discord, a música apareceria duas vezes. Com isto, o Tocando só mostra os podcasts do Spotify (a integração oficial não mostra).")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .padding(.leading, 44)
+            }
         }
         .padding(.vertical, 2)
         .onAppear { clientId = Players.rawClientId(for: id) }
@@ -577,9 +586,9 @@ struct DiscordForm: View {
                     Text("Nome do app (player)").tag("app")
                 }
                 Toggle("Mostrar o álbum", isOn: $showAlbum)
-                Toggle("Botão “\(Players.storeButton)”", isOn: $showButtons)
+                Toggle("Botão para ouvir a música (Apple Music, Spotify, Deezer…)", isOn: $showButtons)
                 Toggle("Continuar no status com a música pausada", isOn: $showPaused)
-                Text("A capa e o botão vêm do catálogo da Apple; músicas que não estão lá (arquivos próprios, gravações) ficam com o ícone do app.")
+                Text("A capa vem do catálogo da Apple, do Deezer ou do MusicBrainz; músicas que não estão em nenhum (arquivos próprios, gravações) ficam com o ícone do app. O botão abre a música no serviço do player que está tocando.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

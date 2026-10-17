@@ -14,6 +14,7 @@ struct ActivityPreview: Equatable {
     var start: Date?
     var end: Date?
     var buttonURL: String?
+    var buttonLabel: String?
     var paused: Bool
 }
 
@@ -39,6 +40,8 @@ final class Presence: ObservableObject {
     @Published private(set) var activeClientId = ""
 
     private var currentKey: String?
+    /// Link da faixa no Spotify ("spotify:track:…"/"spotify:episode:…"), por música.
+    private var spotifyURIs: [String: String] = [:]
     private var lookup: Task<Void, Never>?
     private var bag: Set<AnyCancellable> = []
 
@@ -186,8 +189,16 @@ final class Presence: ObservableObject {
             lookup?.cancel()
             if let t {
                 let key = t.key
+                if t.playerId == Players.spotify, spotifyURIs[key] == nil {
+                    Task { [weak self] in
+                        guard let uri = await ScriptedPlayers.spotifyURI() else { return }
+                        self?.spotifyURIs[key] = uri
+                        self?.refresh()
+                    }
+                }
                 lookup = Task { [weak self] in
-                    let m = await ArtworkLookup.shared.find(title: t.title, artist: t.artist, album: t.album)
+                    let m = await ArtworkLookup.shared.find(title: t.title, artist: t.artist, album: t.album,
+                                                            wantsDeezer: t.playerId == Players.deezer)
                     guard let self, !Task.isCancelled, self.currentKey == key, let m else { return }
                     self.match = m
                     self.history.setMatch(m, key: key)
@@ -223,6 +234,10 @@ final class Presence: ObservableObject {
         if let t = track {
             if !Players.isEnabled(t.playerId) {
                 why = "\(Players.name(t.playerId)) não é compartilhado"
+            } else if t.playerId == Players.spotify, Prefs.bool(Prefs.spotifyOfficial, default: false),
+                      !(spotifyURIs[t.key]?.hasPrefix("spotify:episode:") ?? false) {
+                // A integração oficial do Discord já mostra as músicas (podcasts não).
+                why = "Spotify: com a integração oficial do Discord"
             } else if !t.playing && !showPaused {
                 why = "Pausado"
             } else {
@@ -262,6 +277,8 @@ final class Presence: ObservableObject {
         var end: Date?
         if let start, let d = t.duration { end = start.addingTimeInterval(d / ((t.playbackRate ?? 1) > 0 ? t.playbackRate! : 1)) }
         let album = Prefs.bool(Prefs.showAlbum, default: true) ? t.album : nil
+        let button = Prefs.bool(Prefs.showButtons, default: true)
+            ? Players.button(for: t, match: match, spotifyURI: spotifyURIs[t.key]) : nil
         return ActivityPreview(
             header: "Ouvindo \(appName)",
             memberLine: memberLine,
@@ -271,7 +288,8 @@ final class Presence: ObservableObject {
             imageURL: match?.artworkURL,
             start: start,
             end: end,
-            buttonURL: Prefs.bool(Prefs.showButtons, default: true) ? match?.trackURL : nil,
+            buttonURL: button?.url,
+            buttonLabel: button?.label,
             paused: !t.playing)
     }
 
@@ -294,7 +312,7 @@ final class Presence: ObservableObject {
             if let end = p.end { ts["end"] = Int(end.timeIntervalSince1970 * 1000) }
             a["timestamps"] = ts
         }
-        if let url = p.buttonURL { a["buttons"] = [["label": Players.storeButton, "url": url]] }
+        if let url = p.buttonURL, let label = p.buttonLabel { a["buttons"] = [["label": label, "url": url]] }
         return a
     }
 

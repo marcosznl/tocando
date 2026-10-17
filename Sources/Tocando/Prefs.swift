@@ -16,6 +16,8 @@ enum Prefs {
     static let seenPlayers = "seenPlayers"
     /// Application ID de um app do Discord com o nome de cada player.
     static let playerClientIds = "playerClientIds"
+    /// Músicas do Spotify ficam com a integração oficial do Discord (só podcasts aqui).
+    static let spotifyOfficial = "spotifyOfficial"
     /// Quando o app abre sozinho (LaunchMode).
     static let launchMode = "launchMode"
     /// O ícone some enquanto o app dorme (lido pelo MenuBarExtra).

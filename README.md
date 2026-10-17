@@ -11,12 +11,17 @@ o código-fonte do app, mas não copia nada do Music Presence (código, nome ou 
 - **Tocando agora**: capa, música, artista, álbum, player, progresso e controles (anterior,
   tocar/pausar, próxima; também ⌘espaço, ⌘← e ⌘→). Embaixo, a prévia de como o cartão aparece
   no seu perfil do Discord.
-- **Status no Discord**: atividade "Ouvindo" com a capa, a barra de progresso e o botão
-  "Ouvir no Apple Music". Depois de "Ouvindo" pode vir o artista, a música ou o nome do app.
-  Música pausada sai do status (ou fica, se você preferir).
+- **Status no Discord**: atividade "Ouvindo" com a capa, a barra de progresso e um botão para
+  ouvir a música no serviço do player que está tocando: "Ouvir no Spotify" (link exato da faixa,
+  lido do próprio Spotify), "Ouvir no Deezer", "Ouvir no TIDAL", "Ouvir no Amazon Music" (busca
+  no serviço) ou "Ouvir no Apple Music". Depois de "Ouvindo" pode vir o artista, a música ou o
+  nome do app. Música pausada sai do status (ou fica, se você preferir).
 - **Capas**: o Discord só mostra imagens que estão na internet, e a capa que o player manda fica
-  só no Mac. Por isso o app procura a mesma música no catálogo da Apple (iTunes Search API,
-  pública) e usa a capa e o link de lá. Música que não está no catálogo fica com o ícone do app.
+  só no Mac. O app procura a mesma música no catálogo da Apple (iTunes Search API), depois no
+  Deezer e por fim no MusicBrainz + Cover Art Archive (todos públicos). Música que não está em
+  nenhum fica com o ícone do app.
+- **Spotify conectado ao Discord**: a integração oficial já mostra as músicas; na tela Players,
+  "Deixar as músicas para a integração oficial" faz o Tocando mostrar só os podcasts do Spotify.
 - **Players**: liga e desliga o compartilhamento de cada player. Navegadores e players de vídeo
   começam desligados.
 - **A música tem prioridade**: o macOS só informa quem começou a tocar por último, então um vídeo
@@ -69,7 +74,8 @@ O Discord precisa estar aberto neste Mac (o app de desktop, não o site).
 ## Compilar
 
 ```sh
-./build.sh          # Tocando.app + Tocando.dmg
+./build.sh            # Tocando.app + Tocando.dmg aqui na pasta
+./build.sh --install  # e instala em /Applications (leva junto o "abrir sozinho") e abre
 ```
 
 Precisa das Command Line Tools com o SDK 26.5 (o SDK 27 não tem o plugin das macros do
