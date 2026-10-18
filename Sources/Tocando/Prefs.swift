@@ -27,8 +27,15 @@ enum Prefs {
         UserDefaults.standard.object(forKey: key) as? Bool ?? value
     }
 
+    /// App padrão no portal do Discord (do autor): funciona sem configurar nada.
+    static let defaultClientId = "1560775322172002345"
+    /// Já mostrou a janela de boas-vindas (só na primeira vez que o app abre).
+    static let welcomed = "welcomed"
+
+    /// O Application ID digitado, ou o do app padrão.
     static var clientIdValue: String {
-        (UserDefaults.standard.string(forKey: clientId) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let typed = (UserDefaults.standard.string(forKey: clientId) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return typed.isEmpty ? defaultClientId : typed
     }
 
     /// Tema do app: "" segue o sistema, "light" ou "dark".

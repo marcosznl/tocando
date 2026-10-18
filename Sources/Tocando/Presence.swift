@@ -253,7 +253,7 @@ final class Presence: ObservableObject {
             why = "Compartilhamento desligado"
         } else if why == nil {
             switch discordState {
-            case .idle: why = clientId.isEmpty ? "Falta conectar ao Discord" : "Conectando ao Discord…"
+            case .idle: why = "Conectando ao Discord…"
             case .notRunning: why = "O Discord não está aberto"
             case .connecting: why = "Conectando ao Discord…"
             case .rejected(let msg): why = "O Discord recusou: \(msg)"

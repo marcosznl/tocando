@@ -176,7 +176,6 @@ struct NowPlayingScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
-                if clientId.trimmingCharacters(in: .whitespaces).isEmpty { setupBanner }
                 if let failure = monitor.failure {
                     Label(failure, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
@@ -252,24 +251,6 @@ struct NowPlayingScreen: View {
             }
         }
     }
-
-    private var setupBanner: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "link.circle.fill")
-                .font(.system(size: 30))
-                .foregroundStyle(Color.accent)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Conecte ao Discord").font(.headline)
-                Text("Falta o Application ID do seu app no portal do Discord (leva 1 minuto).")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button("Configurar") { nav.selection = .discord }
-                .buttonStyle(.borderedProminent)
-        }
-        .padding(14)
-        .background(Color.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
 }
 
 // MARK: - Histórico
@@ -331,7 +312,8 @@ struct HistoryScreen: View {
         let cal = Calendar.current
         if cal.isDateInToday(d) { return "Hoje" }
         if cal.isDateInYesterday(d) { return "Ontem" }
-        return d.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalized
+        let text = d.formatted(.dateTime.weekday(.wide).day().month(.wide))
+        return text.prefix(1).uppercased() + text.dropFirst()   // "Sexta-feira, 16 de outubro"
     }
 }
 
@@ -532,7 +514,7 @@ struct DiscordForm: View {
 
     @ObservedObject private var apps = DiscordApps.shared
 
-    private var trimmedId: String { clientId.trimmingCharacters(in: .whitespaces) }
+    private var trimmedId: String { Prefs.clientIdValue }
     private var idLooksValid: Bool { DiscordApps.looksValid(trimmedId) }
 
     var body: some View {
@@ -547,7 +529,7 @@ struct DiscordForm: View {
                 Toggle("Compartilhar no Discord", isOn: $enabled)
             }
             Section {
-                TextField("Application ID", text: $clientId, prompt: Text("ex: 1234567890123456789"))
+                TextField("Application ID", text: $clientId, prompt: Text("vazio: usa o app padrão"))
                     .task(id: trimmedId) { apps.load(trimmedId) }
                 if !clientId.isEmpty && !idLooksValid {
                     Text("O Application ID tem só números (17 a 20 dígitos).")
@@ -556,17 +538,19 @@ struct DiscordForm: View {
                     LabeledContent("Nome no perfil") {
                         Text("Ouvindo \(name)")
                     }
-                    Text("Para trocar, mude o nome do app no portal. Para mostrar o nome de cada player (Spotify, Apple Music…), veja a tela Players.")
+                    Text(clientId.isEmpty
+                         ? "Funciona sem configurar nada. Para outro nome no perfil, crie um app seu (abaixo); para o nome de cada player (Spotify, Apple Music…), veja a tela Players."
+                         : "Para trocar o nome, mude o app no portal. Apague o campo para voltar ao app padrão.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else if apps.invalid.contains(trimmedId) {
                     Text("O Discord não achou um app com esse ID.").font(.caption).foregroundStyle(.orange)
                 }
                 VStack(alignment: .leading, spacing: 6) {
+                    Text("Opcional, para usar um app seu:").fontWeight(.medium)
                     Text("1. Abra o portal de desenvolvedores do Discord e clique em New Application.")
                     Text("2. Dê o nome que deve aparecer no seu perfil (ex: Música) e crie.")
                     Text("3. Em General Information, copie o Application ID e cole acima.")
-                    Text("Opcional: em App Icon, envie o ícone do Tocando; ele aparece quando a música não tem capa.")
-                        .foregroundStyle(.tertiary)
+                    Text("4. Em App Icon, envie o ícone do Tocando (aparece quando a música não tem capa).")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -603,7 +587,7 @@ struct DiscordForm: View {
     private var stateText: String {
         guard enabled else { return "Desligado" }
         switch presence.discordState {
-        case .idle: return clientId.isEmpty ? "Falta o Application ID" : "Conectando…"
+        case .idle: return "Conectando…"
         case .notRunning: return "O Discord não está aberto"
         case .connecting: return "Conectando…"
         case .connected(let user): return "Conectado como \(user)"

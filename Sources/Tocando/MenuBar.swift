@@ -27,10 +27,7 @@ struct MenuBarPanel: View {
             HStack {
                 Text("Tocando").font(.headline)
                 Spacer()
-                Toggle("Compartilhar", isOn: $enabled)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .labelsHidden()
+                PanelSwitch(isOn: $enabled)
                     .help(enabled ? "Parar de compartilhar no Discord" : "Compartilhar no Discord")
             }
             .padding(.horizontal, 12)
@@ -153,5 +150,27 @@ struct MenuRow: View {
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
+    }
+}
+
+/// Interruptor do painel, desenhado em SwiftUI (o nativo não aparece nas
+/// fotos do --snapshot, que desenham o painel fora da tela).
+struct PanelSwitch: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Capsule()
+            .fill(isOn ? Color.accent : Color.secondary.opacity(0.35))
+            .frame(width: 32, height: 19)
+            .overlay(alignment: isOn ? .trailing : .leading) {
+                Circle().fill(.white).padding(2).shadow(color: .black.opacity(0.2), radius: 1, y: 0.5)
+            }
+            .animation(.easeOut(duration: 0.15), value: isOn)
+            .contentShape(Capsule())
+            .onTapGesture { isOn.toggle() }
+            .accessibilityElement()
+            .accessibilityLabel("Compartilhar no Discord")
+            .accessibilityValue(isOn ? "ligado" : "desligado")
+            .accessibilityAddTraits(.isButton)
     }
 }

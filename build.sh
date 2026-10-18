@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Compila e monta "Tocando.app" (e o .dmg de instalação).
+# Compila e monta "Tocando.app" (universal: Apple Silicon e Intel) e o .dmg de instalação.
 #
 # Uso: ./build.sh            só monta (Tocando.app e Tocando.dmg aqui na pasta)
 #      ./build.sh --install  monta, instala em /Applications e abre
@@ -9,7 +9,7 @@ INSTALL=false
 [[ "${1:-}" == "--install" ]] && INSTALL=true
 
 APP="Tocando.app"
-VERSION="1.0"
+VERSION="1.1"
 # Assinatura com certificado fixo, se existir (senão, ad-hoc).
 SIGN="${SIGN:-../iDownloads/sign.sh}"
 MRA=Vendor/mediaremote-adapter
@@ -18,7 +18,9 @@ MRA=Vendor/mediaremote-adapter
 SDK_265=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
 if [[ -z "${SDKROOT:-}" && -d "$SDK_265" ]]; then export SDKROOT="$SDK_265"; fi
 
-swift build -c release
+# Universal (arm64 + x86_64): o mesmo DMG serve para qualquer Mac.
+swift build -c release --arch arm64 --arch x86_64
+BIN="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)/Tocando"
 
 # MediaRemoteAdapter: o /usr/bin/perl (que o macOS deixa ler o "Tocando agora")
 # carrega este framework e manda as mudanças em JSON. Sem cmake: clang direto.
@@ -50,7 +52,7 @@ PLIST
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/pt-BR.lproj" "$APP/Contents/Frameworks"
-cp .build/release/Tocando "$APP/Contents/MacOS/"
+cp "$BIN" "$APP/Contents/MacOS/"
 cp Icon/AppIcon.icns "$APP/Contents/Resources/"
 cp Icon/icon_1024.png "$APP/Contents/Resources/DiscordIcon.png"   # para enviar ao portal do Discord
 cp $MRA/bin/mediaremote-adapter.pl "$APP/Contents/Resources/"
@@ -86,7 +88,7 @@ if [[ -x "$SIGN" ]]; then
 else
     codesign --force --deep -s - "$APP"
 fi
-echo "Pronto: $(pwd)/$APP ($(du -sh "$APP" | cut -f1))"
+echo "Pronto: $(pwd)/$APP ($(du -sh "$APP" | cut -f1), $(lipo -archs "$APP/Contents/MacOS/Tocando"))"
 
 # DMG de instalação (app + atalho para Aplicativos), refeito a cada build.
 DMG="Tocando.dmg"

@@ -119,11 +119,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &bag)
 
         // Começa escondido, só no ícone lá em cima (a MainView fecha a janela
-        // ao aparecer). A janela fica aberta na primeira vez (sem o
-        // Application ID) e quando você abre o app com ele dormindo (sem ícone,
+        // ao aparecer). A janela fica aberta na primeira vez (para mostrar onde
+        // o app fica) e quando você abre o app com ele dormindo (sem ícone,
         // senão pareceria que não abriu).
-        if Prefs.clientIdValue.isEmpty {
-            nav.selection = .discord
+        if !Prefs.bool(Prefs.welcomed, default: false) {
+            UserDefaults.standard.set(true, forKey: Prefs.welcomed)
             NSApp.activate()
         } else if !shouldBeAwake && !launchedAtLogin {
             NSApp.activate()
