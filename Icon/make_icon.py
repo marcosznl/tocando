@@ -1,4 +1,4 @@
-# Ícone do Tocando: o anel do iDownloads/iPlayer com uma nota musical, em roxo e branco.
+# Ícone do Tocando: um anel com uma nota musical, em roxo e branco.
 # Gera icon_1024.png e AppIcon.icns (python3 make_icon.py, dentro da pasta Icon).
 import math, os, shutil, subprocess
 from PIL import Image, ImageDraw, ImageFilter

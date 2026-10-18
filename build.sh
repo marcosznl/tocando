@@ -1,6 +1,5 @@
 #!/bin/zsh
 # Compila e monta "Tocando.app" (e o .dmg de instalação).
-# Precisa do SDK 26.5 (o SDK 27 das Command Line Tools não tem o plugin SwiftUIMacros).
 #
 # Uso: ./build.sh            só monta (Tocando.app e Tocando.dmg aqui na pasta)
 #      ./build.sh --install  monta, instala em /Applications e abre
@@ -11,18 +10,22 @@ INSTALL=false
 
 APP="Tocando.app"
 VERSION="1.0"
-SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
-SIGN=/Users/marcos/Projetos/iDownloads/sign.sh   # certificado fixo dos apps do Marcos
+# Assinatura com certificado fixo, se existir (senão, ad-hoc).
+SIGN="${SIGN:-../iDownloads/sign.sh}"
 MRA=Vendor/mediaremote-adapter
 
-SDKROOT=$SDK swift build -c release
+# O SDK 27 das Command Line Tools não tem o plugin SwiftUIMacros: usa o 26.5 se existir.
+SDK_265=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
+if [[ -z "${SDKROOT:-}" && -d "$SDK_265" ]]; then export SDKROOT="$SDK_265"; fi
+
+swift build -c release
 
 # MediaRemoteAdapter: o /usr/bin/perl (que o macOS deixa ler o "Tocando agora")
 # carrega este framework e manda as mudanças em JSON. Sem cmake: clang direto.
 FW=build/MediaRemoteAdapter.framework
 rm -rf "$FW"
 mkdir -p "$FW/Versions/A/Resources"
-SDKROOT=$SDK clang -dynamiclib -arch arm64 -arch x86_64 -fobjc-arc -fvisibility=default \
+clang -dynamiclib -arch arm64 -arch x86_64 -fobjc-arc -fvisibility=default \
     -mmacosx-version-min=14.0 -w -I$MRA/include -I$MRA/src \
     $MRA/src/adapter/*.m $MRA/src/private/*.m $MRA/src/utility/*.m \
     -framework Foundation -framework AppKit -framework UniformTypeIdentifiers \
@@ -52,6 +55,7 @@ cp Icon/AppIcon.icns "$APP/Contents/Resources/"
 cp Icon/icon_1024.png "$APP/Contents/Resources/DiscordIcon.png"   # para enviar ao portal do Discord
 cp $MRA/bin/mediaremote-adapter.pl "$APP/Contents/Resources/"
 cp -R "$FW" "$APP/Contents/Frameworks/"
+cp $MRA/LICENSE "$APP/Contents/Resources/MediaRemoteAdapter-LICENSE.txt"   # exigido pela licença BSD-3
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

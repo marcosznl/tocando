@@ -1,12 +1,10 @@
-# Tocando — app macOS
+# Tocando
 
 Mostra no seu status do Discord a música que está tocando no Mac ("Ouvindo …"), em qualquer
-player: Música, Spotify, TIDAL, Deezer, Podcasts, iPlayer e o que mais aparecer na Central de
-Controle. Mesma família do iPlayer e do iDownloads (SwiftUI, sem dependências, sem Xcode).
+player: Música, Spotify, TIDAL, Deezer, Podcasts e o que mais aparecer na Central de Controle.
+Feito em SwiftUI, sem Xcode.
 
-Projeto escrito do zero. Ele mora no fork de
-[ungive/discord-music-presence](https://github.com/ungive/discord-music-presence), que não tem
-o código-fonte do app, mas não copia nada do Music Presence (código, nome ou imagens).
+**Requer macOS 14 Sonoma ou mais novo.**
 
 - **Tocando agora**: capa, música, artista, álbum, player, progresso e controles (anterior,
   tocar/pausar, próxima; também ⌘espaço, ⌘← e ⌘→). Embaixo, a prévia de como o cartão aparece
@@ -61,8 +59,7 @@ O Discord precisa estar aberto neste Mac (o app de desktop, não o site).
 ## Como funciona
 
 - **Leitura da música** (`NowPlaying.swift`): desde o macOS 15.4 só apps da Apple podem ler o
-  "Tocando agora". O [MediaRemoteAdapter](https://github.com/ungive/mediaremote-adapter)
-  (BSD-3, em `Vendor/`) contorna isso: o `/usr/bin/perl`, que tem a permissão, carrega um
+  "Tocando agora". O MediaRemoteAdapter (veja [Licenças](#licenças), em `Vendor/`) contorna isso: o `/usr/bin/perl`, que tem a permissão, carrega um
   framework que imprime as mudanças em JSON. O app roda `perl … stream` e lê linha a linha.
   Testado no macOS 27.
 - **Discord** (`Discord.swift`): socket local `$TMPDIR/discord-ipc-N`, o mesmo do Rich Presence
@@ -73,14 +70,23 @@ O Discord precisa estar aberto neste Mac (o app de desktop, não o site).
 
 ## Compilar
 
+Precisa só das Command Line Tools (`xcode-select --install`):
+
 ```sh
 ./build.sh            # Tocando.app + Tocando.dmg aqui na pasta
 ./build.sh --install  # e instala em /Applications (leva junto o "abrir sozinho") e abre
 ```
 
-Precisa das Command Line Tools com o SDK 26.5 (o SDK 27 não tem o plugin das macros do
-SwiftUI). O `build.sh` compila o adaptador com `clang` (sem cmake) e assina com o certificado
-local de `../iDownloads/sign.sh`, quando ele existe.
+O `build.sh` compila o adaptador com `clang` (sem cmake) e assina o app. Com um script de
+assinatura próprio (certificado fixo, para o macOS não esquecer as permissões a cada build),
+aponte `SIGN` para ele: `SIGN=/caminho/sign.sh ./build.sh`; sem ele, a assinatura é ad-hoc.
 
 Para conferir as telas sem abrir a janela: `Tocando.app/Contents/MacOS/Tocando --snapshot <pasta>`
 salva um PNG de cada tela e fecha.
+
+## Licenças
+
+O Tocando é escrito do zero. Ele leva junto, em `Vendor/mediaremote-adapter`, o
+[MediaRemoteAdapter](https://github.com/ungive/mediaremote-adapter), © 2025 Jonas van den Berg e
+colaboradores, sob a licença BSD de 3 cláusulas (`Vendor/mediaremote-adapter/LICENSE`, também
+dentro do app, em `Contents/Resources`).

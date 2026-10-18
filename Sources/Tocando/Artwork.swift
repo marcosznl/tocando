@@ -142,7 +142,7 @@ actor ArtworkLookup {
         guard let url else { return nil }
         var req = URLRequest(url: url)
         if musicBrainz {   // o MusicBrainz exige identificar o app
-            req.setValue("Tocando/1.0 (https://github.com/marcosznl/discord-music-presence)", forHTTPHeaderField: "User-Agent")
+            req.setValue("Tocando/1.0 (https://github.com/marcosznl/tocando)", forHTTPHeaderField: "User-Agent")
         }
         guard let (data, response) = try? await URLSession.shared.data(for: req),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }

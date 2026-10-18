@@ -18,7 +18,7 @@ enum Players {
         "com.colliderli.iina": "IINA",
         "org.videolan.vlc": "VLC",
         "io.mpv": "mpv",
-        "com.marcos.tubeplayer": "iPlayer",
+        "com.marcos.tubeplayer": "iLume",
         "com.apple.Safari": "Safari",
         "com.google.Chrome": "Google Chrome",
         "org.mozilla.firefox": "Firefox",
