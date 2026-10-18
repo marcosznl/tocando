@@ -41,16 +41,21 @@ ring=Image.new("RGBA",(N,N),(0,0,0,0)); rd=d; d=ImageDraw.Draw(ring)
 arc(75,75,42,0,360,10,track,caps=False)
 img.alpha_composite(ring); d=rd
 arc(75,75,42,-90,180,10,white)
-# nota dupla (♫): duas cabeças inclinadas, hastes e a barra
+# nota dupla (♫): duas cabeças inclinadas, hastes e a barra, desenhada numa
+# camada à parte e depois centralizada no anel pela caixa dos pixels.
+note=Image.new("RGBA",(N,N),(0,0,0,0))
 def head(cx,cy):
     hw,hh=8.5*k,6.2*k; x,y=P(cx,cy)
     el=Image.new("RGBA",(N,N),(0,0,0,0)); ImageDraw.Draw(el).ellipse([x-hw,y-hh,x+hw,y+hh],fill=white)
-    el=el.rotate(22,center=(x,y),resample=Image.BICUBIC); img.alpha_composite(el)
+    el=el.rotate(22,center=(x,y),resample=Image.BICUBIC); note.alpha_composite(el)
 head(64,91); head(88,86)
-d=ImageDraw.Draw(img)
+d=ImageDraw.Draw(note)
 stroke([(71.5,89),(71.5,59)],4.5,white)
 stroke([(95.5,84),(95.5,54)],4.5,white)
 d.polygon([P(69.25,60.5),P(97.75,55.5),P(97.75,63.5),P(69.25,68.5)],fill=white)
+x0,y0,x1,y1=note.getchannel("A").getbbox()
+cx,cy=P(75,75)
+img.alpha_composite(note,(round(cx-(x0+x1)/2),round(cy-(y0+y1)/2)))
 img=img.resize((1024,1024),Image.LANCZOS)
 img.save("icon_1024.png")
 
