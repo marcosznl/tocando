@@ -6,6 +6,12 @@ Feito em SwiftUI, sem Xcode.
 
 **Requer macOS 14 Sonoma ou mais novo.**
 
+![Tocando agora, com a prévia de como o status aparece no Discord](docs/tocando.png)
+
+| Histórico | Discord |
+|---|---|
+| ![As músicas que tocaram, por dia](docs/historico.png) | ![Conexão, app no Discord e aparência do status](docs/discord.png) |
+
 - **Tocando agora**: capa, música, artista, álbum, player, progresso e controles (anterior,
   tocar/pausar, próxima; também ⌘espaço, ⌘← e ⌘→). Embaixo, a prévia de como o cartão aparece
   no seu perfil do Discord.
