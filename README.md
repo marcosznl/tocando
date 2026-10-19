@@ -366,7 +366,7 @@ docs/                         imagens deste README
 
 ## Licenças
 
-O Tocando é escrito do zero. Ele leva junto, em `Vendor/mediaremote-adapter`, o
+O Tocando é escrito do zero e distribuído sob a licença [MIT](LICENSE). Ele leva junto, em `Vendor/mediaremote-adapter`, o
 [MediaRemoteAdapter](https://github.com/ungive/mediaremote-adapter), © 2025 Jonas van den Berg e
 colaboradores, sob a licença BSD de 3 cláusulas (`Vendor/mediaremote-adapter/LICENSE`, também
 dentro do app, em `Contents/Resources`).
